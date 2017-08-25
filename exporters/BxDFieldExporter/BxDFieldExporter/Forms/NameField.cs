@@ -10,30 +10,30 @@ using System.Windows.Forms;
 
 namespace BxDFieldExporter.Forms
 {
-    public partial class NameFieldForm : Form
+    public partial class NameField : Form
     {
         public enum NameMode { Initial, SaveAs }
         private NameMode nameMode;
 
-        public NameFieldForm(NameMode mode)
+        public NameField(NameMode mode)
         {
             InitializeComponent();
 
             nameMode = mode;
 
-            txtDirectory.Text = SynthesisGUI.PluginSettings.GeneralSaveLocation;
+            //txtDirectory.Text = SynthesisGUI.PluginSettings.GeneralSaveLocation;
         }
 
-        public static DialogResult NameField(out string FieldName, NameMode mode = NameMode.SaveAs)
+        public static DialogResult NameFieldDialog(out string FieldName, NameMode mode = NameMode.SaveAs)
         {
             try
             {
-                NameFieldForm form = new NameFieldForm(mode);
-                form.ShowDialog();
+                NameField form = new Forms.NameField(mode);
+                //form.ShowDialog;
                 FieldName = form.txtName.Text;
                 return form.DialogResult;
             }
-            catch (Exception e)
+            catch(Exception e)
             {
                 MessageBox.Show(e.ToString());
                 throw;
@@ -48,10 +48,10 @@ namespace BxDFieldExporter.Forms
             {
                 string name = txtName.Text;
 
-                if (File.Exists(SynthesisGUI.PluginSettings.GeneralSaveLocation + "\\" + txtName.Text + @"\skeleton.bxdf") && MessageBox.Show("Overwrite Existing Field?", "Save Field", MessageBoxButtons.YesNo) == DialogResult.No)
-                {
-                    return;
-                }
+                //if(File.Exists(SynthesisGUI.PluginSettings.GeneralSaveLocation + "\\" + txtName.Text + @"\skeleton.bxdf") && MessageBox.Show("Overwrite Existing Field?", "Save Field", MessageBoxButtons.YesNo) == DialogResult.No)
+                //{
+                //    return;
+                //}
 
                 DialogResult = DialogResult.OK;
                 Close();
@@ -59,7 +59,7 @@ namespace BxDFieldExporter.Forms
             else
             {
                 MessageBox.Show("Please enter a name for your field.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            }            
         }
 
         private void CancelButton_Click(object sender, EventArgs e)
@@ -67,7 +67,7 @@ namespace BxDFieldExporter.Forms
             DialogResult warningResult = MessageBox.Show("Are you sure you want to cancel? (All export progress would be lost)",
                 "Cancel", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
-            if ((nameMode == NameMode.Initial && warningResult == DialogResult.Yes) || nameMode == NameMode.SaveAs)
+            if((nameMode == NameMode.Initial && warningResult == DialogResult.Yes) || nameMode == NameMode.SaveAs)
             {
                 DialogResult = DialogResult.Cancel;
                 Close();
@@ -76,18 +76,19 @@ namespace BxDFieldExporter.Forms
 
         private void BrowseButton_Click(object sender, EventArgs e)
         {
-            if (ExportLocationDialog.ShowDialog() == DialogResult.OK)
+            if(dlgSaveDirectory.ShowDialog() == DialogResult.OK)
             {
-                PathTextBox.Text = ExportLocationDialog.SelectedPath;
-                SynthesisGUI.PluginSettings.GeneralSaveLocation = ExportLocationDialog.SelectedPath;
+                txtDirectory.Text = dlgSaveDirectory.SelectedPath;
+                //SynthesisGUI.PluginSettings.GeneralSaveLocation = dlgSaveDirectory.SelectedPath;
             }
+
         }
 
-        private void ExportLocationDialog_HelpRequest(object sender, EventArgs e)
+        private void SaveDirectoryDialog_HelpRequest(object sender, EventArgs e)
         {
-            if (ExportLocationDialog.ShowDialog() == DialogResult.OK)
+            if(dlgSaveDirectory.ShowDialog() == DialogResult.OK)
             {
-                txtDirectory.Text = ExportLocationDialog.SelectedPath;
+                txtDirectory.Text = dlgSaveDirectory.SelectedPath;
             }
         }
     }

@@ -1146,6 +1146,11 @@ Checking “Dynamic” enables an object to be moved in the simulator. For example, 
         //Exports the field
         public void ExportField_OnExecute(NameValueMap Context)
         {
+            // create a new name field form
+            Forms.NameField form = new Forms.NameField(Forms.NameField.NameMode.Initial);
+            //show the form to the user
+            System.Windows.Forms.Application.Run(form);
+
             SetAllButtons(false);
             if (FieldComponents.Count == 0)
             {
