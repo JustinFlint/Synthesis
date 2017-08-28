@@ -10,6 +10,7 @@ using Assets.Scripts.FEA;
 using Assets.Scripts.BUExtensions;
 using Assets.Scripts.FSM;
 using Assets.Scripts;
+using Assets.Scripts.Utils;
 
 /// <summary>
 /// To be attached to all robot parent objects.
@@ -17,7 +18,6 @@ using Assets.Scripts;
 /// </summary>
 public class Robot : MonoBehaviour
 {
-
     private bool isInitialized;
 
     private const float ResetVelocity = 0.05f;
@@ -65,6 +65,7 @@ public class Robot : MonoBehaviour
     string wheelPath;
     float wheelRadius;
     float wheelFriction;
+    float wheelLateralFriction;
     float wheelMass;
 
     private DynamicCamera cam;
@@ -81,7 +82,7 @@ public class Robot : MonoBehaviour
     /// </summary>
     void Start()
     {
-        
+
         StateMachine.Instance.Link<MainState>(this);
     }
 
@@ -105,7 +106,7 @@ public class Robot : MonoBehaviour
                 keyDownTime = Time.time;
             }
 
-            else if (InputControl.GetButton(Controls.buttons[ControlIndex].resetRobot) && 
+            else if (InputControl.GetButton(Controls.buttons[ControlIndex].resetRobot) &&
                 !mainState.DynamicCameraObject.GetComponent<DynamicCamera>().cameraState.GetType().Equals(typeof(DynamicCamera.ConfigurationState)))
             {
                 if (Time.time - keyDownTime > HOLD_TIME)
@@ -165,11 +166,12 @@ public class Robot : MonoBehaviour
         {
             wheelPath = RobotTypeManager.WheelPath;
             wheelFriction = RobotTypeManager.WheelFriction;
+            wheelLateralFriction = RobotTypeManager.WheelLateralFriction;
             wheelRadius = RobotTypeManager.WheelRadius;
             wheelMass = RobotTypeManager.WheelMass;
 
             RobotIsMecanum = RobotTypeManager.IsMecanum;
-        } 
+        }
 
         #region Robot Initialization
         RobotDirectory = directory;
@@ -189,7 +191,7 @@ public class Robot : MonoBehaviour
         SensorManager sensorManager = GameObject.Find("SensorManager").GetComponent<SensorManager>();
         sensorManager.ResetSensorLists();
 
-        
+
 
         //Removes Driver Practice component if it exists
         if (dpmRobot != null)
@@ -216,7 +218,7 @@ public class Robot : MonoBehaviour
         //Initializes the wheel variables
         int numWheels = nodes.Count(x => x.HasDriverMeta<WheelDriverMeta>() && x.GetDriverMeta<WheelDriverMeta>().type != WheelType.NOT_A_WHEEL);
         float collectiveMass = 0f;
- 
+
 
         //Initializes the nodes and creates joints for the robot
         if (RobotIsMixAndMatch && !RobotIsMecanum) //If the user is in MaM and the robot they select is not mecanum, create the nodes and replace the wheel meshes to match those selected
@@ -231,7 +233,7 @@ public class Robot : MonoBehaviour
                 return false;
             }
 
-            node.CreateJoint(numWheels, RobotIsMixAndMatch, wheelFriction);
+            node.CreateJoint(numWheels, RobotIsMixAndMatch);
 
             if (node.PhysicalProperties != null)
                 collectiveMass += node.PhysicalProperties.mass;
@@ -301,13 +303,13 @@ public class Robot : MonoBehaviour
                 }
 
                 //Create the joints that interact with physics
-                node.CreateJoint(numWheels, RobotIsMixAndMatch, wheelFriction);
+                node.CreateJoint(numWheels, RobotIsMixAndMatch, wheelFriction, wheelLateralFriction);
 
                 if (node.HasDriverMeta<WheelDriverMeta>())
                 {
                     node.MainObject.GetComponent<BRaycastWheel>().Radius = wheelRadius;
                 }
-                   
+
                 if (node.PhysicalProperties != null)
                     collectiveMass += node.PhysicalProperties.mass;
 
@@ -381,7 +383,7 @@ public class Robot : MonoBehaviour
         if (!hasRobotCamera)
         {
             //Attached to the main frame and face the front
-            robotCameraManager.AddCamera(this, transform.GetChild(0).transform,new Vector3(0, 0.5f, 0), new Vector3(0, 0, 0));
+            robotCameraManager.AddCamera(this, transform.GetChild(0).transform, new Vector3(0, 0.5f, 0), new Vector3(0, 0, 0));
             ////Attached to main frame and face the back
             robotCameraManager.AddCamera(this, transform.GetChild(0).transform, new Vector3(0, 0.5f, 0), new Vector3(0, 180, 0));
             robotCameraManager.AddCamera(this, transform.GetChild(0).transform);
@@ -444,9 +446,10 @@ public class Robot : MonoBehaviour
                 r.WorldTransform = newTransform;
             }
 
-         
+
             if (RobotHasManipulator && RobotIsMixAndMatch)
             {
+                int i = 0;
                 foreach (RigidNode n in manipulatorNode.ListAllNodes())
                 {
                     BRigidBody br = n.MainObject.GetComponent<BRigidBody>();
@@ -463,6 +466,11 @@ public class Robot : MonoBehaviour
                     newTransform.Origin = (robotStartPosition + n.ComOffset).ToBullet();
                     newTransform.Basis = BulletSharp.Math.Matrix.Identity;
                     r.WorldTransform = newTransform;
+                    if (i == 0)
+                    {
+                        Debug.Log("Transform Origin" + newTransform.Origin);
+                    }
+                    i++;
                 }
 
             }
@@ -708,15 +716,12 @@ public class Robot : MonoBehaviour
     /// </summary>
     public bool LoadManipulator(string directory, GameObject robotGameObject)
     {
-        if(robotGameObject == null)
+
+        if (robotGameObject == null)
         {
             robotGameObject = GameObject.Find("Robot");
         }
         ManipulatorObject = new GameObject("Manipulator");
-
-        //Set the manipulator transform to match with the position of node_0 of the robot. THIS ONE ACTUALLY DOES SOMETHING:
-        ManipulatorObject.transform.position = robotGameObject.transform.GetChild(0).transform.position;
-        //manipulatorObject.transform.position = robotStartPosition;
 
         RigidNode_Base.NODE_FACTORY = delegate (Guid guid)
         {
@@ -733,6 +738,7 @@ public class Robot : MonoBehaviour
 
         //Load node_0 for attaching manipulator to robot
         RigidNode node = (RigidNode)nodes[0];
+
         node.CreateTransform(ManipulatorObject.transform);
         if (!node.CreateMesh(directory + "\\" + node.ModelFileName))
         {
@@ -741,6 +747,12 @@ public class Robot : MonoBehaviour
             return false;
         }
         GameObject robot = robotGameObject;
+
+        //Set the manipulator transform to match with the position of node_0 of the robot. THIS ONE ACTUALLY DOES SOMETHING: LIKE ACTUALLY
+        Vector3 manipulatorTransform = robotStartPosition;
+        Debug.Log("Node Com Offset" + node.ComOffset);
+        ManipulatorObject.transform.position = manipulatorTransform;
+
         node.CreateManipulatorJoint(robot);
         node.MainObject.AddComponent<Tracker>().Trace = true;
         Tracker t = node.MainObject.GetComponent<Tracker>();
@@ -767,6 +779,8 @@ public class Robot : MonoBehaviour
             r.RaycastRobot.OverrideMass = collectiveMass;
 
         RotateRobot(robotStartOrientation);
+
+        this.RobotHasManipulator = true;
         return true;
     }
 
@@ -803,7 +817,7 @@ public class Robot : MonoBehaviour
     {
         float weight = 0;
 
-        foreach(Transform child in gameObject.transform)
+        foreach (Transform child in gameObject.transform)
         {
             if (child.GetComponent<BRigidBody>() != null)
             {
